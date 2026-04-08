@@ -9,3 +9,9 @@ tail-logs:
 
 run:
     cargo run --bin slopmon
+
+up:
+    sudo docker compose up --detach
+
+down:
+    sudo docker compose down
