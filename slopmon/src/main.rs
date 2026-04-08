@@ -38,6 +38,7 @@ fn main() -> anyhow::Result<()> {
         let config = toml::from_str(&slop_file)?;
         config
     };
+    let config = Arc::from(config);
 
     let stdout = File::create(slop_dir.join("daemon.out"))?;
     let stderr = File::create(slop_dir.join("daemon.err"))?;
@@ -58,8 +59,9 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_process(home: &Path, config: &Config) -> anyhow::Result<()> {
+fn run_process(home: &Path, config: &Arc<Config>) -> anyhow::Result<()> {
     let file_offset_map: Arc<RwLock<HashMap<String, u32>>> = Arc::new(RwLock::new(HashMap::new()));
+    let config = Arc::clone(config);
 
     let mut debouncer = notify_debouncer_mini::new_debouncer(
         Duration::from_secs(5),
@@ -78,13 +80,21 @@ fn run_process(home: &Path, config: &Config) -> anyhow::Result<()> {
 
                         match process_codex_event(&event, &start_offset) {
                             Ok(output) => {
-                                println!("output: {:#?}", output);
+                                println!("output: {:?}", output);
+                                // update file offset map with newest recorded offset
                                 file_offset_map
                                     .write()
                                     .unwrap()
                                     .insert(output.path, output.new_offset);
 
-                                // todo: send an api request or something here with the new max token count for the user
+                                if output.new_max_tokens > 0 {
+                                    // todo: send an api request or something here with the new max token count for the user
+                                    let user = config.user.clone();
+                                    let tokens = output.new_max_tokens;
+                                    let req = LeaderboardPayload { user, tokens };
+
+                                    println!("request payload: {:#?}", req);
+                                }
                             }
                             Err(e) => println!("error: {:#?}", e),
                         }
@@ -159,8 +169,6 @@ struct Message {
 
 #[derive(Deserialize)]
 struct MessagePayload {
-    #[serde(rename = "type")]
-    msg_type: String,
     info: MessageInfo,
 }
 
@@ -172,4 +180,10 @@ struct MessageInfo {
 #[derive(Deserialize)]
 struct MessageTokenUsage {
     total_tokens: u32,
+}
+
+#[derive(Serialize, Debug)]
+struct LeaderboardPayload {
+    tokens: u32,
+    user: String,
 }

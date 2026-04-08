@@ -8,4 +8,4 @@ tail-logs:
     tail -f ~/.slop/daemon.out
 
 run:
-    cargo run
+    cargo run --bin slopmon
