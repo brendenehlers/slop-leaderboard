@@ -3,4 +3,4 @@ name = "slopboard"
 version = "0.1.0"
 edition = "2024"
 resolver = "3"
-members = ["leaderboard", "slopmon"]
+members = ["common","leaderboard", "slopmon"]

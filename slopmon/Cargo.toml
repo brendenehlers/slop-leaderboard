@@ -11,3 +11,4 @@ daemonize = "0.5.0"
 notify = "8.2.0"
 notify-debouncer-mini = "0.7.0"
 toml = { version = "1.1.2", features = ["serde"] }
+common = { path = "../common" }

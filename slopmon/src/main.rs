@@ -1,12 +1,11 @@
+use common::LeaderboardPayload;
 use daemonize::Daemonize;
 use serde::{Deserialize, Serialize};
 use std::{
-    cmp::max,
     collections::HashMap,
     fs::File,
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    rc::Rc,
+    io::Write,
+    path::Path,
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -111,8 +110,6 @@ fn run_process(home: &Path, config: &Arc<Config>) -> anyhow::Result<()> {
     )?;
 
     loop {}
-
-    Ok(())
 }
 
 fn process_codex_event(
@@ -180,10 +177,4 @@ struct MessageInfo {
 #[derive(Deserialize)]
 struct MessageTokenUsage {
     total_tokens: u32,
-}
-
-#[derive(Serialize, Debug)]
-struct LeaderboardPayload {
-    tokens: u32,
-    user: String,
 }
