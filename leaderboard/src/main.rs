@@ -36,6 +36,7 @@ async fn update_tokens(
     State(state): State<AppState>,
     Json(payload): Json<LeaderboardPayload>,
 ) -> Json<common::LeaderboardResponse> {
+    println!("POST /update_tokens {:?}", payload);
     let mut map = state.write().await;
     let entry = map.entry(payload.user.clone()).or_insert(0);
     if payload.tokens > *entry {
