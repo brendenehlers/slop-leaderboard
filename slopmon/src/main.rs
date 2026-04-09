@@ -61,12 +61,14 @@ fn main() -> anyhow::Result<()> {
 fn run_process(home: &Path, config: &Arc<Config>) -> anyhow::Result<()> {
     let file_offset_map: Arc<RwLock<HashMap<String, u32>>> = Arc::new(RwLock::new(HashMap::new()));
     let config = Arc::clone(config);
+    let reqwest_client = Arc::new(reqwest::blocking::Client::new());
 
     let mut debouncer = notify_debouncer_mini::new_debouncer(
         Duration::from_secs(5),
         move |res: notify_debouncer_mini::DebounceEventResult| match res {
             Ok(events) => {
                 let file_offset_map = Arc::clone(&file_offset_map);
+                let reqwest_client = Arc::clone(&reqwest_client);
                 for event in events {
                     if event.path.to_str().unwrap().contains("jsonl") {
                         println!("emitted: {:?}", event);
@@ -91,6 +93,16 @@ fn run_process(home: &Path, config: &Arc<Config>) -> anyhow::Result<()> {
                                     let user = config.user.clone();
                                     let tokens = output.new_max_tokens;
                                     let req = LeaderboardPayload { user, tokens };
+
+                                    match reqwest_client
+                                        .post("http://localhost:3000/update_tokens")
+                                        .json(&req)
+                                        .header("Content-Type", "application/json")
+                                        .send()
+                                    {
+                                        Ok(_) => {}
+                                        Err(e) => println!("error occured calling service: {}", e),
+                                    }
 
                                     println!("request payload: {:#?}", req);
                                 }
