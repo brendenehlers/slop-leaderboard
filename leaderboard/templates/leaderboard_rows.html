@@ -1,0 +1,15 @@
+{% for (name, tokens) in entries %}
+<div class="entry {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}rank-other{% endif %}">
+    <div class="rank-num">
+        {% if loop.index == 1 %}&#x1F451;{% elif loop.index == 2 %}#2{% elif loop.index == 3 %}#3{% else %}#{{ loop.index }}{% endif %}
+    </div>
+    <div class="crawler-name">{{ name }}</div>
+    <div class="token-count" data-user="{{ name }}" data-value="{{ tokens }}"><span class="token-unit">TOK</span></div>
+</div>
+{% else %}
+<div class="empty-state">
+    <span class="empty-icon">&#x1F9E0;</span>
+    NO INFERENCE DETECTED ON THIS CLUSTER<br>
+    <small>Standing by for operator data&hellip; context window is quiet. <em>Too</em> quiet.</small>
+</div>
+{% endfor %}

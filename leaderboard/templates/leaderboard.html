@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TOKEN BURN RANKINGS :: LIVE INFERENCE FEED</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.3/sse.js"></script>
     <style>
         :root {
             --bg: #06060e;
@@ -18,6 +20,8 @@
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { font-size: 120%; }
 
         body {
             background: var(--bg);
@@ -275,6 +279,22 @@
             letter-spacing: 0.1em;
             animation: ticker-scroll 50s linear infinite;
         }
+
+        /* Number slot animation */
+        .num-wrap {
+            display: inline-block;
+            overflow: hidden;
+            height: 1.2em;
+            vertical-align: middle;
+            position: relative;
+        }
+        .num-slot {
+            position: absolute;
+            top: 0;
+            right: 0;
+            white-space: nowrap;
+            line-height: 1.2em;
+        }
     </style>
 </head>
 <body>
@@ -307,23 +327,11 @@
         <div style="text-align:right">Tokens Burned</div>
     </div>
 
-    {% if entries.is_empty() %}
-    <div class="empty-state">
-        <span class="empty-icon">&#x1F9E0;</span>
-        NO INFERENCE DETECTED ON THIS CLUSTER<br>
-        <small>Standing by for operator data&hellip; context window is quiet. <em>Too</em> quiet.</small>
-    </div>
-    {% else %}
-    {% for (name, tokens) in entries %}
-    <div class="entry {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}rank-other{% endif %}">
-        <div class="rank-num">
-            {% if loop.index == 1 %}&#x1F451;{% elif loop.index == 2 %}#2{% elif loop.index == 3 %}#3{% else %}#{{ loop.index }}{% endif %}
+    <div hx-ext="sse" sse-connect="/sse">
+        <div id="leaderboard-rows" sse-swap="update" hx-swap="innerHTML">
+            {% include "leaderboard_rows.html" %}
         </div>
-        <div class="crawler-name">{{ name }}</div>
-        <div class="token-count">{{ tokens }}<span class="token-unit">TOK</span></div>
     </div>
-    {% endfor %}
-    {% endif %}
 
 </div>
 
@@ -351,5 +359,65 @@
     </span>
 </div>
 
+<script>
+(function () {
+    function fmt(n) { return n.toLocaleString(); }
+
+    function animateSlot(el, toVal, oldVal) {
+        const unit = el.querySelector('.token-unit');
+        let wrap = el.querySelector('.num-wrap');
+        if (!wrap) {
+            wrap = document.createElement('span');
+            wrap.className = 'num-wrap';
+            el.insertBefore(wrap, unit);
+        }
+
+        const oldSlot = wrap.querySelector('.num-slot');
+        const newSlot = document.createElement('span');
+        newSlot.className = 'num-slot';
+        newSlot.textContent = fmt(toVal);
+        newSlot.style.transform = 'translateY(-100%)';
+        wrap.appendChild(newSlot);
+
+        // Size wrap to fit new number (offsetWidth forces synchronous layout)
+        wrap.style.minWidth = newSlot.offsetWidth + 'px';
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            newSlot.style.transition = 'transform 0.45s cubic-bezier(0.33, 1, 0.68, 1)';
+            newSlot.style.transform = 'translateY(0)';
+            if (oldSlot) {
+                oldSlot.style.transition = 'transform 0.45s cubic-bezier(0.32, 0, 0.67, 0)';
+                oldSlot.style.transform = 'translateY(100%)';
+                setTimeout(() => oldSlot.remove(), 500);
+            }
+        }));
+    }
+
+    function initAll(root, savedVals) {
+        root.querySelectorAll('[data-user]').forEach(function(el) {
+            const newVal = parseInt(el.dataset.value) || 0;
+            const oldVal = savedVals ? savedVals.get(el.dataset.user) : undefined;
+            animateSlot(el, newVal, oldVal);
+        });
+    }
+
+    const rows = document.getElementById('leaderboard-rows');
+    if (!rows) return;
+
+    initAll(rows, null);
+
+    const saved = new Map();
+    document.addEventListener('htmx:sseMessage', function() {
+        rows.querySelectorAll('[data-user]').forEach(function(el) {
+            saved.set(el.dataset.user, parseInt(el.dataset.value) || 0);
+        });
+    });
+
+    new MutationObserver(function() {
+        initAll(rows, saved);
+        saved.clear();
+    }).observe(rows, { childList: true });
+}());
+</script>
 </body>
 </html>
