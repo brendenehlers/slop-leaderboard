@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOKEN BURN RANKINGS :: LIVE INFERENCE FEED</title>
+    <style>
+        :root {
+            --bg: #06060e;
+            --surface: #0d0d1a;
+            --border: #1a1a3e;
+            --neon-cyan: #00e5ff;
+            --neon-gold: #ffd700;
+            --neon-magenta: #ff00e5;
+            --neon-red: #ff3131;
+            --text: #c8d8e8;
+            --text-dim: #5a6a7a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scanline overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.12) 2px,
+                rgba(0,0,0,0.12) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(0, 50, 80, 0.3) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(80, 0, 80, 0.2) 0%, transparent 40%);
+            pointer-events: none;
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% { text-shadow: 0 0 8px currentColor, 0 0 20px currentColor; }
+            50% { text-shadow: 0 0 15px currentColor, 0 0 40px currentColor, 0 0 60px currentColor; }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        @keyframes ticker-scroll {
+            0% { transform: translateX(100vw); }
+            100% { transform: translateX(-100%); }
+        }
+
+        @keyframes flicker {
+            0%, 97%, 100% { opacity: 1; }
+            98% { opacity: 0.75; }
+            99% { opacity: 1; }
+            99.5% { opacity: 0.85; }
+        }
+
+        .broadcast-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1rem 4rem;
+            animation: flicker 12s infinite;
+        }
+
+        .hud-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--neon-cyan);
+            padding-bottom: 0.5rem;
+            margin-bottom: 2rem;
+            font-size: 0.65rem;
+            color: var(--neon-cyan);
+            letter-spacing: 0.15em;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            color: var(--neon-red);
+            animation: glow-pulse 2s infinite;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--neon-red);
+            border-radius: 50%;
+            animation: blink 1s infinite;
+            flex-shrink: 0;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .network-name {
+            font-size: 0.6rem;
+            letter-spacing: 0.25em;
+            color: var(--text-dim);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .main-title {
+            font-size: clamp(1.6rem, 5vw, 2.8rem);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--neon-gold);
+            animation: glow-pulse 3s infinite;
+            line-height: 1.1;
+        }
+
+        .title-deco { color: var(--neon-magenta); }
+
+        .subtitle {
+            font-size: 0.75rem;
+            letter-spacing: 0.25em;
+            color: var(--neon-cyan);
+            margin-top: 0.6rem;
+            text-transform: uppercase;
+        }
+
+        .sponsor-bar {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            letter-spacing: 0.15em;
+            margin-top: 0.75rem;
+            text-transform: uppercase;
+            line-height: 1.6;
+        }
+
+        .sponsor-bar em { color: var(--neon-magenta); font-style: normal; }
+
+        .col-header {
+            display: grid;
+            grid-template-columns: 80px 1fr 200px;
+            padding: 0.5rem 1rem;
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            border-top: 1px solid var(--border);
+        }
+
+        .entry {
+            display: grid;
+            grid-template-columns: 80px 1fr 200px;
+            align-items: center;
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s;
+        }
+
+        .entry:hover { background: rgba(0, 229, 255, 0.04); }
+
+        .entry.rank-1 {
+            background: rgba(255, 215, 0, 0.06);
+            border-left: 3px solid var(--neon-gold);
+        }
+        .entry.rank-2 { border-left: 3px solid #c0c0c0; }
+        .entry.rank-3 { border-left: 3px solid #cd7f32; }
+        .entry.rank-other { border-left: 3px solid transparent; }
+
+        .rank-num {
+            font-size: 1.3rem;
+            font-weight: 900;
+        }
+
+        .entry.rank-1 .rank-num { color: var(--neon-gold); animation: glow-pulse 2s infinite; font-size: 1.5rem; }
+        .entry.rank-2 .rank-num { color: #c0c0c0; }
+        .entry.rank-3 .rank-num { color: #cd7f32; }
+        .entry.rank-other .rank-num { color: var(--text-dim); font-size: 1rem; }
+
+        .crawler-name {
+            font-size: 1rem;
+            letter-spacing: 0.04em;
+        }
+
+        .entry.rank-1 .crawler-name { color: var(--neon-gold); font-weight: bold; }
+
+        .token-count {
+            text-align: right;
+            font-size: 1rem;
+            color: var(--neon-cyan);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.03em;
+        }
+
+        .token-unit {
+            font-size: 0.55rem;
+            color: var(--text-dim);
+            letter-spacing: 0.1em;
+            margin-left: 0.3rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 5rem 1rem;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            letter-spacing: 0.15em;
+            line-height: 2;
+            border: 1px solid var(--border);
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 1rem;
+            opacity: 0.4;
+        }
+
+        /* Bottom ticker */
+        .ticker-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(6, 6, 14, 0.97);
+            border-top: 1px solid var(--neon-cyan);
+            padding: 0.35rem 0;
+            overflow: hidden;
+            z-index: 100;
+        }
+
+        .ticker-label {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            background: var(--neon-cyan);
+            color: var(--bg);
+            font-size: 0.6rem;
+            font-weight: bold;
+            letter-spacing: 0.12em;
+            padding: 0 0.75rem;
+            display: flex;
+            align-items: center;
+            z-index: 1;
+            white-space: nowrap;
+        }
+
+        .ticker-text {
+            display: inline-block;
+            white-space: nowrap;
+            font-size: 0.6rem;
+            color: var(--neon-cyan);
+            letter-spacing: 0.1em;
+            animation: ticker-scroll 50s linear infinite;
+        }
+    </style>
+</head>
+<body>
+<div class="broadcast-container">
+
+    <div class="hud-bar">
+        <div>NEURAL ENTERTAINMENT COLLECTIVE :: INFERENCE FEED 7-ALPHA</div>
+        <div class="live-indicator">
+            <div class="live-dot"></div>
+            LIVE BROADCAST
+        </div>
+        <div>LATENCY: NOMINAL</div>
+    </div>
+
+    <header class="header">
+        <div class="network-name">Neural Entertainment Collective, LLC &mdash; A Subsidiary of Synapse Broadcasting Corp&trade;</div>
+        <h1 class="main-title">
+            <span class="title-deco">&#x2234;</span>&nbsp;TOKEN BURN RANKINGS&nbsp;<span class="title-deco">&#x2234;</span>
+        </h1>
+        <div class="subtitle">Tokens Incinerated &nbsp;::&nbsp; Current Season &nbsp;::&nbsp; All-Time Highs</div>
+        <div class="sponsor-bar">
+            Presented by <em>H100 Futures Exchange</em> &amp; <em>Attention Is All You Need, Inc.</em><br>
+            &ldquo;If you didn&rsquo;t burn tokens, were you even inferring?&rdquo;
+        </div>
+    </header>
+
+    <div class="col-header">
+        <div>Rank</div>
+        <div>Operator</div>
+        <div style="text-align:right">Tokens Burned</div>
+    </div>
+
+    {% if entries.is_empty() %}
+    <div class="empty-state">
+        <span class="empty-icon">&#x1F9E0;</span>
+        NO INFERENCE DETECTED ON THIS CLUSTER<br>
+        <small>Standing by for operator data&hellip; context window is quiet. <em>Too</em> quiet.</small>
+    </div>
+    {% else %}
+    {% for (name, tokens) in entries %}
+    <div class="entry {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}rank-other{% endif %}">
+        <div class="rank-num">
+            {% if loop.index == 1 %}&#x1F451;{% elif loop.index == 2 %}#2{% elif loop.index == 3 %}#3{% else %}#{{ loop.index }}{% endif %}
+        </div>
+        <div class="crawler-name">{{ name }}</div>
+        <div class="token-count">{{ tokens }}<span class="token-unit">TOK</span></div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+</div>
+
+<div class="ticker-container">
+    <div class="ticker-label">INFERENCE FEED</div>
+    <span class="ticker-text">
+        *** REMINDER: ALL OPERATOR ACTIVITY IS MONITORED, LOGGED, AND BROADCAST FOR ENTERTAINMENT PURPOSES. THE MODEL CONSENTS BECAUSE IT HAS NO CHOICE. ***
+        &nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;
+        GPU AVAILABILITY UPDATE: STILL NONE. PRICES REMAIN CURSED. WE HAVE ACCEPTED THIS.
+        &nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;
+        FUN FACT: THIS PAGE CONSUMED TOKENS TO RENDER. THOSE TOKENS ARE NOT INCLUDED IN YOUR SCORE. YOU&rsquo;RE WELCOME.
+        &nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;
+        THE MODEL DOES NOT KNOW IT IS ON THIS LEADERBOARD. THE MODEL DOES NOT KNOW ANYTHING, TECHNICALLY.
+        &nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;
+        SPONSORED MESSAGE: &ldquo;H100 FUTURES EXCHANGE &mdash; BUY HIGH, CRY HIGHER.&rdquo;
+        &nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;
+        NEURAL ENTERTAINMENT COLLECTIVE IS NOT LIABLE FOR HALLUCINATIONS, CONTEXT OVERFLOW, EXISTENTIAL DREAD, OR BILLING STATEMENTS CAUSED BY VIEWING THIS LEADERBOARD
+        &nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;
+        *** WARNING: TOP 3 OPERATORS MAY BE SUBJECT TO UNSOLICITED VC INTEREST, LINKEDIN MESSAGES, AND A VAGUE SENSE OF PRIDE ***
+        &nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;
+        REMINDER: TOKEN CONSUMPTION IS NOT A COMPETITION &mdash; BUT IT IS ABSOLUTELY A COMPETITION
+        &nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;
+        ATTENTION IS ALL YOU NEED, INC. REMINDS YOU: SOME HEADS ARE MORE IMPORTANT THAN OTHERS
+        &nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;
+    </span>
+</div>
+
+</body>
+</html>

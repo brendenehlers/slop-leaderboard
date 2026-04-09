@@ -19,17 +19,17 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn root<'a>(State(state): State<AppState>) -> HelloTemplate<'a> {
-    let hello = HelloTemplate {
-        name: "Evil Elaina >:(",
-    };
-    hello
+async fn root(State(state): State<AppState>) -> LeaderboardTemplate {
+    let map = state.read().await;
+    let mut entries: Vec<(String, u32)> = map.iter().map(|(k, v)| (k.clone(), *v)).collect();
+    entries.sort_by(|a, b| b.1.cmp(&a.1));
+    LeaderboardTemplate { entries }
 }
 
 #[derive(askama::Template, askama_web::WebTemplate)]
-#[template(path = "hello.html")]
-struct HelloTemplate<'a> {
-    name: &'a str,
+#[template(path = "leaderboard.html")]
+struct LeaderboardTemplate {
+    entries: Vec<(String, u32)>,
 }
 
 async fn update_tokens(
