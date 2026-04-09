@@ -5,3 +5,8 @@ pub struct LeaderboardPayload {
     pub tokens: u32,
     pub user: String,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LeaderboardResponse {
+    pub ok: bool,
+}
